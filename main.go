@@ -28,13 +28,21 @@ func generateToken() (string, error) {
 func registerHandler(w http.ResponseWriter, r *http.Request) {
 	email := r.FormValue("email")
 	password := r.FormValue("password")
+	if email == "" || password == "" {
+		http.Error(w, "Email and password are reuired", http.StatusBadRequest)
+		return
+	}
+
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
+		log.Printf("Error hashing password: %v", err)
+
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 	verificationToken, err := generateToken()
 	if err != nil {
+		log.Printf("Error generating token: %v", http.StatusInternalServerError)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -44,6 +52,13 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 		VerificationToken: verificationToken,
 		IsVerified:        false,
 	}
+
+	if err := db.Create(&user).Error; err != nil {
+		log.Printf("Error creating user: %v", err)
+		http.Error(w, "Could not create user", http.StatusInternalServerError)
+		return
+	}
+
 	// TODO: Send VerificationToken email with Mailhog
 	w.Write([]byte("User registered successfull"))
 }
