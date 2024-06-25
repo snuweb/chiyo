@@ -1,29 +1,39 @@
 package main
 
 import (
-	"html/template"
+	"fmt"
+	"log"
 	"net/http"
 
+	"gorm.io/driver/mysql"
+
+	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	"gorm.io/gorm"
 )
 
+var db *gorm.DB
+
 func main() {
+
+	fmt.Println("starting to initialize chi routes...")
+
 	r := chi.NewRouter()
+	var err error
+
 	r.Use(middleware.Logger)
+	dsn := "root:@tcp(127.0.0.1:3306)/dada?charset=utf8mb4&parseTime=True&loc=Local"
 
-	// Serve static files
-	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
+	db, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	// Define your routes
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		tmpl := template.Must(template.ParseFiles("templates/index.html"))
-		data := map[string]string{
-			"Title":   "Welcome to My Backend",
-			"Content": "This is the content of the homepage.",
-		}
-		tmpl.Execute(w, data)
+		w.Write([]byte("Hello, world"))
 	})
 
-	http.ListenAndServe(":3000", r)
+	fmt.Println("finished initialize")
+	http.ListenAndServe(":8080", r)
+
 }
