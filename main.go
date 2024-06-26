@@ -3,15 +3,13 @@ package main
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"fmt"
 	"log"
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/mysql"
-
-	"github.com/go-chi/chi/middleware"
-	"github.com/go-chi/chi/v5"
 	"gorm.io/gorm"
 )
 
@@ -28,24 +26,26 @@ func generateToken() (string, error) {
 func registerHandler(w http.ResponseWriter, r *http.Request) {
 	email := r.FormValue("email")
 	password := r.FormValue("password")
+
 	if email == "" || password == "" {
-		http.Error(w, "Email and password are reuired", http.StatusBadRequest)
+		http.Error(w, "Email and password are required", http.StatusBadRequest)
 		return
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		log.Printf("Error hashing password: %v", err)
-
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
+
 	verificationToken, err := generateToken()
 	if err != nil {
-		log.Printf("Error generating token: %v", http.StatusInternalServerError)
+		log.Printf("Error generating token: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
+
 	user := User{
 		Email:             email,
 		Password:          string(hashedPassword),
@@ -59,33 +59,39 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Send VerificationToken email with Mailhog
-	w.Write([]byte("User registered successfull"))
+	// TODO: Send verification email with MailHog
+
+	w.Write([]byte("User registered successfully"))
 }
 
 func main() {
-
-	fmt.Println("starting to initialize chi routes...")
-
 	r := chi.NewRouter()
-	// Database Connection
-	var err error
-
 	r.Use(middleware.Logger)
-	dsn := "root:@tcp(127.0.0.1:3306)/dada?charset=utf8mb4&parseTime=True&loc=Local"
 
+	// Database connection
+	var err error
+	dsn := "root:@tcp(127.0.0.1:3306)/dada?charset=utf8mb4&parseTime=True&loc=Local"
 	db, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Could not connect to the database: %v", err)
 	}
-	// migrate the scheme
-	db.AutoMigrate(&User{})
-	// Endpoints
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Hello, world"))
-	})
-	r.Post("/register", registerHandler)
-	fmt.Println("finished initialize")
-	http.ListenAndServe(":8080", r)
 
+	log.Println("Connected to the database")
+
+	// Migrate the schema
+	err = db.AutoMigrate(&User{})
+	if err != nil {
+		log.Fatalf("Could not migrate the database: %v", err)
+	}
+
+	log.Println("Database migrated successfully")
+
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("Hello, world!"))
+	})
+
+	r.Post("/register", registerHandler)
+
+	log.Println("Starting server on :8080")
+	http.ListenAndServe(":8080", r)
 }
