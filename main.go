@@ -3,12 +3,14 @@ package main
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"log"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"golang.org/x/crypto/bcrypt"
+	"gopkg.in/gomail.v2"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
@@ -21,6 +23,47 @@ func generateToken() (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(bytes), nil
+}
+
+func sendVerificationEmail(email string, token string) error {
+	m := gomail.NewMessage()
+	m.SetHeader("From", "no-reply@example.com")
+	m.SetHeader("To", email)
+	m.SetHeader("Subject", "Please verify your email address")
+	m.SetBody("text/plain", fmt.Sprintf("Please click the following link to verify your email address: http://localhost:8080/verify?token=%s", token))
+
+	// MailHog SMTP server
+	d := gomail.NewDialer("localhost", 1025, "", "")
+
+	if err := d.DialAndSend(m); err != nil {
+		return err
+	}
+	return nil
+}
+
+func verifyHandler(w http.ResponseWriter, r *http.Request) {
+	token := r.URL.Query().Get("token")
+	if token == "" {
+		http.Error(w, "Token is required", http.StatusBadRequest)
+		return
+	}
+
+	var user User
+	if err := db.Where("verification_token = ?", token).First(&user).Error; err != nil {
+		log.Printf("Err", err)
+		http.Error(w, "Invalid token", http.StatusBadRequest)
+		return
+	}
+	user.IsVerified = true
+	user.VerificationToken = ""
+
+	if err := db.Save(&user).Error; err != nil {
+		log.Printf("Error updating user: %v", err)
+		http.Error(w, "could not verify user", http.StatusInternalServerError)
+		return
+	}
+
+	w.Write([]byte("Email verified successfully"))
 }
 
 func registerHandler(w http.ResponseWriter, r *http.Request) {
@@ -91,6 +134,7 @@ func main() {
 	})
 
 	r.Post("/register", registerHandler)
+	r.Get("/verify", verifyHandler)
 
 	log.Println("Starting server on :8080")
 	http.ListenAndServe(":8080", r)
