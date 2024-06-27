@@ -32,7 +32,7 @@ func sendVerificationEmail(email string, token string) error {
 	m.SetHeader("Subject", "Please verify your email address")
 	m.SetBody("text/plain", fmt.Sprintf("Please click the following link to verify your email address: http://localhost:8080/verify?token=%s", token))
 
-	// MailHog SMTP server
+	// MailHog SMTP server should use port 1025
 	d := gomail.NewDialer("localhost", 1025, "", "")
 
 	if err := d.DialAndSend(m); err != nil {
@@ -102,7 +102,11 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Send verification email with MailHog
+	if err := sendVerificationEmail(email, verificationToken); err != nil {
+		log.Printf("Error sending verification email: %v", err)
+		http.Error(w, "Could not send verification email", http.StatusInternalServerError)
+		return
+	}
 
 	w.Write([]byte("User registered successfully"))
 }
