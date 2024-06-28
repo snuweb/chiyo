@@ -22,8 +22,18 @@ func generateToken() (string, error) {
 	if _, err := rand.Read(bytes); err != nil {
 		return "", err
 	}
+
 	return hex.EncodeToString(bytes), nil
 }
+
+
+func generate3() (string, error){
+	
+	// slice of 16 lenght and will store the random values 
+	bytes :=make([]bytes, 16)
+	if _, err = rand.Read(beytes); 
+}öj
+
 
 func sendVerificationEmail(email string, token string) error {
 	m := gomail.NewMessage()
@@ -41,6 +51,8 @@ func sendVerificationEmail(email string, token string) error {
 	return nil
 }
 
+
+
 func verifyHandler(w http.ResponseWriter, r *http.Request) {
 	token := r.URL.Query().Get("token")
 	if token == "" {
@@ -49,7 +61,7 @@ func verifyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var user User
-	if err := db.Where("verification_token = ?", token).First(&user).Error; err != nil {
+	if err := db.Where("verification_token = ?", token).First(&user).rror; err != nil {
 		log.Printf("Err", err)
 		http.Error(w, "Invalid token", http.StatusBadRequest)
 		return
