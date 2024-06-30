@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"html/template"
 	"log"
 	"net/http"
 
@@ -26,14 +27,19 @@ func generateToken() (string, error) {
 	return hex.EncodeToString(bytes), nil
 }
 
+func generateNewToken() (string, error) {
+	// make slice of 16 length
+	bytes := make([]byte, 16)
 
-func generate3() (string, error){
-	
-	// slice of 16 lenght and will store the random values 
-	bytes :=make([]bytes, 16)
-	if _, err = rand.Read(beytes); 
-}öj
+	// fill the slice and check the error at the same time
+	if _, err := rand.Read(bytes); err != nil {
 
+		return "", err
+
+	}
+
+	return hex.EncodeToString(bytes), nil
+}
 
 func sendVerificationEmail(email string, token string) error {
 	m := gomail.NewMessage()
@@ -51,7 +57,23 @@ func sendVerificationEmail(email string, token string) error {
 	return nil
 }
 
+// send email
 
+// func sendVerificationEmailTwo(email string, token string) error {
+// 	m := gomail.NewMessage()
+// 	m.SetHeader("From", "no-reply@myganacsi.com")
+// 	m.SetHeader("To", email)
+// 	m.SetHeader("Subject", "Please verify your email address")
+// 	m.SetBody("text/plain", fmt.Sprintf("Please click the flowing link to verify your email address: localhost:8080/verify?token=%s", token))
+
+// 	// mailHog SMTO server should use port 1025
+// 	d := gomail.NewDialer("localhost", 1025, "", "")
+
+// 	if err := d.DialAndSend(m); err != nil {
+// 		return err
+// 	}
+// 	return nil
+// }
 
 func verifyHandler(w http.ResponseWriter, r *http.Request) {
 	token := r.URL.Query().Get("token")
@@ -61,7 +83,7 @@ func verifyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var user User
-	if err := db.Where("verification_token = ?", token).First(&user).rror; err != nil {
+	if err := db.Where("verification_token = ?", token).First(&user).Error; err != nil {
 		log.Printf("Err", err)
 		http.Error(w, "Invalid token", http.StatusBadRequest)
 		return
@@ -122,6 +144,45 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Write([]byte("User registered successfully"))
 }
+func loginFormHandler(w http.ResponseWriter, r *http.Request) {
+	tmpl, err := template.ParseFiles("./templates/login.html")
+	if err != nil {
+		log.Printf("Error parsing template: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	tmpl.Execute(w, nil)
+}
+
+func loginHandler(w http.ResponseWriter, r *http.Request) {
+	email := r.FormValue("email")
+	password := r.FormValue("password")
+
+	if email == "" || password == "" {
+		http.Error(w, "Email and password are required", http.StatusBadRequest)
+		return
+	}
+
+	var user User
+	if err := db.Where("email = ?", email).First(&user).Error; err != nil {
+		log.Printf("Error finding user: %v", err)
+		http.Error(w, "Invalid email or password", http.StatusUnauthorized)
+		return
+	}
+
+	if !user.IsVerified {
+		http.Error(w, "Email not verified", http.StatusUnauthorized)
+		return
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
+		log.Printf("Error comparing password: %v", err)
+		http.Error(w, "Invalid email or password", http.StatusUnauthorized)
+		return
+	}
+
+	w.Write([]byte("Login successful"))
+}
 
 func main() {
 	r := chi.NewRouter()
@@ -151,6 +212,11 @@ func main() {
 
 	r.Post("/register", registerHandler)
 	r.Get("/verify", verifyHandler)
+
+	r.Post("/register", registerHandler)
+	r.Get("/verify", verifyHandler)
+	r.Get("/login", loginFormHandler)
+	r.Post("/login", loginHandler)
 
 	log.Println("Starting server on :8080")
 	http.ListenAndServe(":8080", r)
