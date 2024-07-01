@@ -27,6 +27,10 @@ func generateToken() (string, error) {
 	return hex.EncodeToString(bytes), nil
 }
 
+func newmailesender(email string, token string) error {
+
+}
+
 func generateNewToken() (string, error) {
 	// make slice of 16 length
 	bytes := make([]byte, 16)
